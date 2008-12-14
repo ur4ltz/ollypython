@@ -127,3 +127,13 @@ watchdog = WatchDog(10)
 
 # Load the users personal init file
 
+
+# Plugin callback handlers
+ollypython_shortcuts = []
+
+def add_shortcut_handler(func):
+    # Need to also make sure the function is the right type
+    ollypython_shortcuts.append(func)
+
+def remove_shortcut_handler(func):
+    ollypython_shortcuts.remove(func)
