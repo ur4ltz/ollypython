@@ -106,7 +106,7 @@ BOOL OllyPython_Init(void)
     PathRemoveFileSpec(initfile);
     strncat(initfile, "\\python", 7);
 
-    snprintf(tmp, MAX_PATH+16, "OLLYPYTHON_PATH='%s'", initfile);
+    snprintf(tmp, MAX_PATH+16, "OLLYPYTHON_PATH=\"%s\"", initfile);
     PyRun_SimpleString(tmp);
 
     strncat(initfile, "\\init.py", 8);
@@ -135,18 +135,52 @@ void OllyPython_Destroy(void)
 
 void OllyPython_RunScript(char *script)
 {
-    char scriptpath[MAX_PATH];
+    char userscript[MAX_PATH];
+    char slashpath[MAX_PATH+1];
+    char statement[MAX_PATH+13];
     int validfile;
+    char *scriptpath;
+    int i;
 
-    scriptpath[0] = '\0';
+    userscript[0] = '\0';
 
-    validfile = Browsefilename("title", scriptpath, ".py", 1);
-    if (!validfile)
+    if (script)
     {
-        return;
+        scriptpath = script;
+    }
+    else
+    {
+        scriptpath = userscript;
+
+        validfile = Browsefilename("title", scriptpath, ".py", 1);
+
+        if (!validfile)
+        {
+            return;
+        }
     }
 
-    ExecFile(scriptpath);
+    for (i=0; scriptpath[i]; i++)
+    {
+        if (scriptpath[i] == '\\')
+        {
+            slashpath[i] = '/';
+        }
+        else
+        {
+            slashpath[i] = scriptpath[i];
+        }
+    }
+
+    slashpath[i] = '\0';
+
+    snprintf(statement, sizeof(statement), "runscript(\"%s\")", slashpath);
+    PyRun_SimpleString(statement);
+    
+    if (PyErr_Occurred())
+    {
+        PyErr_Print();
+    }
 }
 
 BOOL WINAPI DllEntryPoint(HINSTANCE hi,DWORD reason,LPVOID reserved)
@@ -201,7 +235,7 @@ extc int  _export cdecl ODBG_Pluginmenu(int origin,char data[4096],void *item)
     {
         case PM_MAIN:
             strcpy(data, "0 Python &file...,");
-            strcat(data, "1 Python &command...|");
+            //strcat(data, "1 Python &command...|");
             strcat(data, "2 &About");
             return 1;
         default:
@@ -236,6 +270,26 @@ extc void _export cdecl ODBG_Pluginaction(int origin,int action,void *item)
 
 extc int  _export cdecl ODBG_Pluginshortcut(int origin,int ctrl,int alt,int shift,int key,void *item)
 {
+    PyObject *shortcuts;
+    int i;
+    int shortcut_size;
+    PyObject *result;
+    PyObject *func;
+
+    shortcuts = PyObject_GetAttrString(NULL, "ollypython_shortcuts");
+    shortcut_size = PyList_Size(shortcuts);
+
+    for (i = 0; i < shortcut_size; i++)
+    {
+        func = PyList_GetItem(shortcuts, i);
+        result = PyObject_CallObject(func, NULL);
+        if (PyInt_AsLong(result) == 1)
+        {
+            /* The shortcut was handled */
+            return 1;
+        }
+    }
+
     return 0;
 }
 
